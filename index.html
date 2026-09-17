@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meridian Portfolio — Property Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --navy: #17303D;
+    --navy-deep: #0F2129;
+    --navy-line: #2B4A59;
+    --paper: #F6F2E9;
+    --paper-dim: #EFE9DA;
+    --ink: #1E2B30;
+    --ink-soft: #4B5D63;
+    --line: #C9C1AC;
+    --amber: #C97C1F;
+    --amber-deep: #A5620F;
+    --sage: #5B7A5E;
+    --rust: #A8432E;
+    --cream: #EDE7D9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--navy);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, -apple-system, Segoe UI, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.serif{
+    font-family:'Fraunces', Georgia, 'Times New Roman', serif;
+    font-weight:500;
+    letter-spacing:-0.01em;
+  }
+  .mono{font-family:'IBM Plex Mono', ui-monospace, Menlo, monospace;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+
+  .app{display:flex; min-height:100vh;}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:260px; flex:0 0 260px;
+    background:var(--navy-deep); color:var(--cream);
+    padding:28px 22px 22px;
+    display:flex; flex-direction:column; gap:28px;
+  }
+  .brand{display:flex; flex-direction:column; gap:4px; border-bottom:1px solid var(--navy-line); padding-bottom:20px;}
+  .brand .mark{
+    width:34px;height:34px; border:1.5px solid var(--amber);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces',serif; font-size:17px; color:var(--amber); margin-bottom:8px;
+  }
+  .brand h1{font-size:19px; margin:0; color:var(--cream); line-height:1.2;}
+  .brand p{margin:2px 0 0; font-size:12.5px; color:#9DB0B8;}
+  .nav-label{font-size:12.5px; color:#8FA3AB; margin:0 0 10px;}
+  .property-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;}
+  .property-item{
+    display:flex; flex-direction:column; gap:2px; padding:11px 12px;
+    border-left:2px solid transparent; cursor:pointer;
+    transition:background .12s ease, border-color .12s ease; border-radius:2px;
+  }
+  .property-item:hover{background:rgba(255,255,255,0.04);}
+  .property-item.active{background:rgba(201,124,31,0.12); border-left-color:var(--amber);}
+  .property-item .pname{font-size:14.5px;color:var(--cream);}
+  .property-item .ptype{font-size:11.5px;color:#8FA3AB;}
+  .property-item .pstatus{font-size:10.5px; margin-top:3px; color:var(--amber);}
+  .property-item.pending .pname{color:#B9C4C9;}
+  .add-property{
+    margin-top:auto; border:1px dashed var(--navy-line); border-radius:2px; padding:12px;
+    font-size:12.5px; color:#9DB0B8; text-align:left; background:transparent; cursor:pointer;
+  }
+  .add-property:hover{border-color:var(--amber); color:var(--cream);}
+
+  /* ---------- Main ---------- */
+  .main{flex:1; padding:28px 36px 60px; max-width:1180px;}
+
+  .titleblock{
+    background:var(--paper); border:1px solid var(--line); border-radius:2px;
+    padding:22px 26px; display:flex; justify-content:space-between; align-items:flex-end;
+    gap:24px; margin-bottom:18px; position:relative;
+  }
+  .corner{position:absolute; width:10px; height:10px;}
+  .corner.tl{top:-1px;left:-1px;border-top:2px solid var(--amber);border-left:2px solid var(--amber);}
+  .corner.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--amber);border-right:2px solid var(--amber);}
+  .titleblock h2{font-size:26px;margin:0 0 4px;color:var(--ink);}
+  .titleblock .addr{font-size:13.5px;color:var(--ink-soft);}
+  .stat-strip{display:flex;gap:26px;}
+  .stat{text-align:right;}
+  .stat .val{font-size:17px;font-family:'IBM Plex Mono',monospace;color:var(--ink);}
+  .stat .lab{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+
+  .tabs{display:flex; gap:2px; border-bottom:1px solid var(--navy-line); margin-bottom:22px;}
+  .tab{padding:10px 16px; font-size:13.5px; color:#B9CBD2; cursor:pointer; border-bottom:2px solid transparent; transition:color .12s ease, border-color .12s ease;}
+  .tab:hover{color:#fff;}
+  .tab.active{color:#fff; border-color:var(--amber);}
+
+  .sheet{background:var(--paper); border:1px solid var(--line); border-radius:2px; padding:24px; position:relative; margin-bottom:18px;}
+  .sheet h3{font-size:16px;margin:0 0 14px;color:var(--ink);}
+  .sheet .note{font-size:12.5px;color:var(--ink-soft);margin-top:10px;}
+
+  .empty-state{text-align:left; padding:10px 4px 4px;}
+  .empty-state h3{margin-bottom:8px;}
+  .empty-state p{color:var(--ink-soft); font-size:13.5px; max-width:520px; line-height:1.55;}
+  .empty-state button{
+    margin-top:14px; background:var(--amber); color:#fff; border:none;
+    padding:9px 16px; font-size:13px; border-radius:2px; cursor:pointer;
+  }
+  .empty-state button:hover{background:var(--amber-deep);}
+
+  /* map */
+  .map-shell{position:relative; border:1px solid var(--line); border-radius:2px; overflow:hidden;}
+  .map-canvas{height:380px; width:100%; background:#FBF8F1;}
+  .diagram-body{background:#FBF8F1;}
+  .diagram-body svg{display:block; width:100%; height:auto;}
+  .minimap-wrap{
+    position:absolute; bottom:10px; right:10px; width:140px; height:110px;
+    border:1.5px solid var(--ink); border-radius:2px; overflow:hidden; z-index:500;
+    box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  }
+  .compass{
+    position:absolute; top:12px; right:12px; z-index:500;
+    background:rgba(246,242,233,0.92); border:1px solid var(--line); border-radius:2px;
+    width:38px; height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink);
+  }
+  .compass .arrow{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:12px solid var(--ink); margin-bottom:2px;}
+  .map-caption{font-size:11.5px; color:var(--ink-soft); margin-top:8px;}
+
+  .floor-tabs{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;}
+  .floor-tab{padding:6px 12px; font-size:12.5px; border:1px solid var(--line); border-radius:2px; cursor:pointer; color:var(--ink-soft); background:#fff;}
+  .floor-tab:hover{border-color:var(--amber);}
+  .floor-tab.active{border-color:var(--amber); color:var(--ink); background:#FCF0DE;}
+
+  .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:12px; font-size:11.5px; color:var(--ink-soft);}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:10px;height:10px;display:inline-block;border-radius:1px; border:1px solid rgba(30,43,48,0.35);}
+
+  .evac-note{
+    margin-top:12px; padding:10px 12px; background:#FCF0DE; border:1px solid var(--line);
+    border-radius:2px; font-size:12.5px; color:var(--ink);
+  }
+
+  /* POC cards */
+  .poc-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:14px;}
+  .poc-card{border:1px solid var(--line); border-radius:2px; padding:14px; background:#fff; display:flex; gap:12px;}
+  .avatar{width:38px;height:38px;border-radius:50%;flex:0 0 38px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-family:'IBM Plex Mono',monospace;}
+  .poc-info .trade{font-size:11px; color:var(--ink-soft); margin-bottom:2px;}
+  .poc-info .company{font-size:14px; color:var(--ink); margin-bottom:2px;}
+  .poc-info .contact{font-size:12.5px; color:var(--ink-soft);}
+  .poc-info .meta{font-size:11.5px; color:#7C8B90; margin-top:6px; font-family:'IBM Plex Mono',monospace;}
+
+  /* maintenance log */
+  .log-table{width:100%; border-collapse:collapse; font-size:13px;}
+  .log-table th{text-align:left; font-size:11px; color:var(--ink-soft); font-weight:500; padding:0 10px 8px 0; border-bottom:1px solid var(--line);}
+  .log-table td{padding:10px 10px 10px 0; border-bottom:1px solid #E7E0CE; vertical-align:top;}
+  .badge{display:inline-block; font-size:11px; padding:2px 8px; border-radius:2px; font-family:'IBM Plex Mono',monospace;}
+  .badge.open{background:#F5E1CB; color:var(--amber-deep);}
+  .badge.progress{background:#E4E7DD; color:var(--sage);}
+  .badge.resolved{background:#E9EFE9; color:#3E5B41;}
+  .pri{font-size:11px; font-family:'IBM Plex Mono',monospace;}
+  .pri.high{color:var(--rust);}
+  .pri.medium{color:var(--amber-deep);}
+  .pri.low{color:var(--ink-soft);}
+
+  .log-form{margin-top:20px; padding-top:18px; border-top:1px dashed var(--line); display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .log-form .full{grid-column:1/-1;}
+  .field label{display:block; font-size:11.5px; color:var(--ink-soft); margin-bottom:5px;}
+  .field select, .field input, .field textarea{width:100%; padding:8px 9px; border:1px solid var(--line); border-radius:2px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink);}
+  .field textarea{resize:vertical; min-height:52px;}
+  .log-form .submit-row{grid-column:1/-1; display:flex; justify-content:flex-end;}
+  .log-form button{background:var(--amber); color:#fff; border:none; padding:9px 18px; font-size:13px; border-radius:2px; cursor:pointer;}
+  .log-form button:hover{background:var(--amber-deep);}
+
+  .fade-in{animation:fadeIn .22s ease;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(3px);} to{opacity:1; transform:translateY(0);}}
+
+  @media (max-width: 860px){
+    .app{flex-direction:column;}
+    .sidebar{width:100%; flex:none; flex-direction:row; overflow-x:auto; align-items:flex-start;}
+    .brand{border-bottom:none; padding-bottom:0;}
+    .property-list{flex-direction:row;}
+    .add-property{display:none;}
+    .main{padding:20px;}
+    .titleblock{flex-direction:column; align-items:flex-start;}
+    .stat-strip{align-self:stretch; justify-content:space-between;}
+    .stat{text-align:left;}
+    .poc-grid{grid-template-columns:1fr;}
+    .log-form{grid-template-columns:1fr;}
+    .minimap-wrap{width:100px; height:80px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">M</div>
+      <h1>Meridian Portfolio</h1>
+      <p>Facilities viewer — demo data</p>
+    </div>
+    <div>
+      <p class="nav-label">Properties</p>
+      <ul class="property-list" id="propertyList"></ul>
+    </div>
+    <button class="add-property" id="addPropertyBtn">+ Add a property</button>
+  </aside>
+
+  <main class="main">
+    <div class="titleblock" id="titleblock"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="tabContent"></div>
+  </main>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Mock data model
+----------------------------------------------------------------*/
+function room(x,y,w,h,label,use){ return {x,y,w,h,label,use}; }
+
+const USE_COLORS = {
+  office:    {fill:'#FFFFFF', label:'Office'},
+  corridor:  {fill:'#EFE9DA', label:'Corridor'},
+  restroom:  {fill:'#CFE0E3', label:'Restroom'},
+  mechanical:{fill:'#E8DFC9', label:'Mechanical / electrical'},
+  storage:   {fill:'#E3DED0', label:'Storage'},
+  stair:     {fill:'#F3D9B5', label:'Stairwell (egress)'},
+  elevator:  {fill:'#D9CFEA', label:'Elevator'},
+  lobby:     {fill:'#FBEBD2', label:'Lobby'},
+  retail:    {fill:'#F6E3C9', label:'Retail'},
+  common:    {fill:'#DCE7DC', label:'Common / amenity'},
+};
+
+const buildings = [
+  {
+    id:'ashford',
+    name:'Ashford Commons',
+    type:'Class A office',
+    address:'124 Ashford Dunwoody Rd NE, Atlanta, GA',
+    status:'active',
+    center:{lat:33.9304, lng:-84.3200},
+    footprint:[[33.9308,-84.3206],[33.9308,-84.3194],[33.9300,-84.3194],[33.9300,-84.3206]],
+    stats:{ area:'86,400 sf', floors:4, built:'1998', occ:'92%' },
+    core:{
+      corridor:{x:40,y:130,w:600,h:40},
+      stairs:[
+        {id:'stairA', label:'Stair A', x:0, y:100, w:40, h:100},
+        {id:'stairB', label:'Stair B', x:640, y:100, w:40, h:100},
+      ],
+      elevator:{x:300,y:170,w:60,h:40,label:'Elevator'},
+    },
+    exteriorExits:[{x:20,y:100,side:'left'},{x:660,y:100,side:'right'},{x:330,y:260,side:'bottom'}],
+    assembly:{x:340,y:290,label:'Assembly point — front lawn'},
+    floors:[
+      { id:'f1', label:'Floor 1', sub:'Lobby & retail', groundFloor:true,
+        rooms:[
+          room(80,40,104,90,'Lobby','lobby'), room(184,40,104,90,'Cafe','retail'),
+          room(288,40,104,90,'Restroom','restroom'), room(392,40,104,90,'Mechanical','mechanical'),
+          room(496,40,104,90,'Mail Room','office'),
+          room(80,170,130,90,'Suite 100','office'), room(210,170,130,90,'Loading','storage'),
+          room(370,170,130,90,'Suite 110','office'),
+        ]},
+      { id:'f2', label:'Floor 2', sub:'Suites 200–240', groundFloor:false,
+        rooms:[
+          room(80,40,104,90,'Suite 200','office'), room(184,40,104,90,'Suite 210','office'),
+          room(288,40,104,90,'Restroom','restroom'), room(392,40,104,90,'Mechanical','mechanical'),
+          room(496,40,104,90,'Suite 220','office'),
+          room(80,170,130,90,'Suite 230','office'), room(210,170,130,90,'Storage','storage'),
+          room(370,170,130,90,'Suite 240','office'),
+        ]},
+      { id:'f3', label:'Floor 3', sub:'Suites 300–340', groundFloor:false,
+        rooms:[
+          room(80,40,104,90,'Suite 300','office'), room(184,40,104,90,'Suite 310','office'),
+          room(288,40,104,90,'Restroom','restroom'), room(392,40,104,90,'Mechanical','mechanical'),
+          room(496,40,104,90,'Suite 320','office'),
+          room(80,170,130,90,'Suite 330','office'), room(210,170,130,90,'Storage','storage'),
+          room(370,170,130,90,'Suite 340','office'),
+        ]},
+      { id:'f4', label:'Floor 4', sub:'Suites 400–430, roof access', groundFloor:false,
+        rooms:[
+          room(80,40,104,90,'Suite 400','office'), room(184,40,104,90,'Suite 410','office'),
+          room(288,40,104,90,'Restroom','restroom'), room(392,40,104,90,'Mechanical','mechanical'),
+          room(496,40,104,90,'Suite 420','office'),
+          room(80,170,130,90,'Suite 430','office'), room(210,170,130,90,'Roof Access','storage'),
+          room(370,170,130,90,'Suite 440','office'),
+        ]},
+    ],
+    pocs:[
+      { trade:'HVAC', company:'Peachtree Mechanical', contact:'Dana Ruiz', phone:'(404) 555-0142', email:'druiz@ptmech.com', last:'2026-08-14', color:'#4472A8' },
+      { trade:'Electrical', company:'Capitol Electric', contact:'Marcus Yee', phone:'(404) 555-0198', email:'myee@capitolelectric.com', last:'2026-07-02', color:'#C97C1F' },
+      { trade:'Plumbing', company:'Southern Plumbing Svc', contact:'Alan Cho', phone:'(770) 555-0117', email:'acho@southernplumb.com', last:'2026-06-20', color:'#5B7A5E' },
+      { trade:'Fire & life safety', company:'SafeGuard Fire Protection', contact:'Renee Ibarra', phone:'(404) 555-0176', email:'ribarra@safeguardfire.com', last:'2026-09-01', color:'#A8432E' },
+      { trade:'Elevator', company:'Atlanta Elevator Co.', contact:'Tom Bracket', phone:'(404) 555-0163', email:'tbracket@atlelevator.com', last:'2026-05-11', color:'#6E5A9E' },
+    ],
+    issues:[
+      { id:'ISS-1042', title:'RTU-3 not cooling', location:'Suite 310', category:'HVAC', priority:'high', status:'open', reportedBy:'B. Lyle, tenant', date:'Sep 15, 2026' },
+      { id:'ISS-1039', title:'Ceiling tile water stain', location:'Restroom, Floor 2', category:'Plumbing', priority:'medium', status:'progress', reportedBy:'Site tech', date:'Sep 10, 2026' },
+      { id:'ISS-1035', title:'Door closer broken', location:'Stair A', category:'Fire & life safety', priority:'medium', status:'open', reportedBy:'Site tech', date:'Sep 8, 2026' },
+      { id:'ISS-1031', title:'Exit sign out', location:'Stair B', category:'Fire & life safety', priority:'medium', status:'resolved', reportedBy:'Site tech', date:'Aug 28, 2026' },
+      { id:'ISS-1022', title:'Slow response', location:'Elevator', category:'Elevator', priority:'low', status:'resolved', reportedBy:'Property manager', date:'Aug 12, 2026' },
+    ],
+  },
+  {
+    id:'vinings',
+    name:'The Vinings at Chattahoochee',
+    type:'Multifamily — clubhouse',
+    address:'3800 Paces Ferry Rd SE, Atlanta, GA',
+    status:'active',
+    center:{lat:33.8637, lng:-84.4646},
+    footprint:[[33.8640,-84.4650],[33.8640,-84.4642],[33.8634,-84.4642],[33.8634,-84.4650]],
+    stats:{ area:'9,200 sf', floors:2, built:'2005', occ:'96%' },
+    core:{
+      corridor:{x:40,y:120,w:400,h:36},
+      stairs:[{id:'stairA', label:'Stair A', x:0, y:95, w:40, h:86}],
+      elevator:{x:220,y:156,w:56,h:36,label:'Elevator'},
+    },
+    exteriorExits:[{x:20,y:95,side:'left'},{x:400,y:138,side:'right'}],
+    assembly:{x:230,y:250,label:'Assembly point — parking lot A'},
+    floors:[
+      { id:'c1', label:'Floor 1', sub:'Leasing & amenities', groundFloor:true,
+        rooms:[
+          room(80,35,110,85,'Leasing Office','office'), room(200,35,100,85,'Fitness Center','common'),
+          room(310,35,90,85,'Restroom','restroom'),
+          room(80,156,120,80,'Clubhouse Lounge','common'), room(296,156,104,80,'Pool Deck Access','common'),
+        ]},
+      { id:'c2', label:'Floor 2', sub:'Management & community', groundFloor:false,
+        rooms:[
+          room(80,35,120,85,'Management Office','office'), room(210,35,100,85,'Community Room','common'),
+          room(320,35,80,85,'Restroom','restroom'),
+          room(80,156,150,80,'Mail & Package Room','office'), room(240,156,110,80,'Storage','storage'),
+        ]},
+    ],
+    pocs:[
+      { trade:'HVAC', company:'Chattahoochee Air', contact:'Priya Nair', phone:'(770) 555-0184', email:'pnair@chatt-air.com', last:'2026-08-22', color:'#4472A8' },
+      { trade:'Landscaping', company:'Vinings Grounds Co.', contact:'Jose Marti', phone:'(770) 555-0129', email:'jmarti@viningsgrounds.com', last:'2026-09-05', color:'#5B7A5E' },
+      { trade:'Fire & life safety', company:'SafeGuard Fire Protection', contact:'Renee Ibarra', phone:'(404) 555-0176', email:'ribarra@safeguardfire.com', last:'2026-07-30', color:'#A8432E' },
+      { trade:'Pool service', company:'Blue Water Pool Mgmt', contact:'Casey Dunn', phone:'(404) 555-0155', email:'cdunn@bluewaterpool.com', last:'2026-09-12', color:'#C97C1F' },
+    ],
+    issues:[
+      { id:'ISS-2015', title:'Pool gate latch loose', location:'Pool Deck Access', category:'Maintenance', priority:'medium', status:'open', reportedBy:'Resident', date:'Sep 14, 2026' },
+      { id:'ISS-2011', title:'Projector bulb out', location:'Community Room', category:'Maintenance', priority:'low', status:'open', reportedBy:'Leasing staff', date:'Sep 9, 2026' },
+      { id:'ISS-2003', title:'Irrigation line break', location:'North lawn', category:'Landscaping', priority:'high', status:'resolved', reportedBy:'Grounds crew', date:'Aug 30, 2026' },
+    ],
+  },
+  {
+    id:'midtown',
+    name:'Midtown Exchange',
+    type:'Retail / mixed-use',
+    address:'875 West Peachtree St NW, Atlanta, GA',
+    status:'pending',
+    center:{lat:33.7838, lng:-84.3860},
+    stats:{},
+    floors:[],
+    pocs:[],
+    issues:[],
+  },
+];
+
+const state = { buildingId:'ashford', tab:'overview', floorIndex:0 };
+let mapCounter = 0;
+
+function getBuilding(){ return buildings.find(b=>b.id===state.buildingId); }
+
+/* ---------------------------------------------------------------
+   Sidebar
+----------------------------------------------------------------*/
+function renderSidebar(){
+  const list = document.getElementById('propertyList');
+  list.innerHTML = buildings.map(b => `
+    <li class="property-item ${b.id===state.buildingId?'active':''} ${b.status==='pending'?'pending':''}" data-id="${b.id}">
+      <span class="pname">${b.name}</span>
+      <span class="ptype">${b.type}</span>
+      ${b.status==='pending' ? '<span class="pstatus">Survey pending</span>' : ''}
+    </li>
+  `).join('');
+  [...list.querySelectorAll('.property-item')].forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.buildingId = el.dataset.id;
+      state.tab = 'overview';
+      state.floorIndex = 0;
+      renderAll();
+    });
+  });
+}
+
+/* ---------------------------------------------------------------
+   Titleblock
+----------------------------------------------------------------*/
+function renderTitleblock(){
+  const b = getBuilding();
+  const el = document.getElementById('titleblock');
+  if(b.status==='pending'){
+    el.innerHTML = `
+      <div class="corner tl"></div><div class="corner br"></div>
+      <div><h2>${b.name}</h2><div class="addr">${b.address}</div></div>
+      <div class="stat-strip"><span class="pstatus" style="color:var(--amber)">Not yet surveyed</span></div>
+    `;
+    return;
+  }
+  el.innerHTML = `
+    <div class="corner tl"></div><div class="corner br"></div>
+    <div>
+      <h2>${b.name}</h2>
+      <div class="addr">${b.address} — ${b.type}</div>
+    </div>
+    <div class="stat-strip">
+      <div class="stat"><div class="val">${b.stats.area}</div><div class="lab">Total area</div></div>
+      <div class="stat"><div class="val">${b.stats.floors}</div><div class="lab">Floors</div></div>
+      <div class="stat"><div class="val">${b.stats.built}</div><div class="lab">Year built</div></div>
+      <div class="stat"><div class="val">${b.stats.occ}</div><div class="lab">Occupied</div></div>
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------------
+   Tabs
+----------------------------------------------------------------*/
+const TABS = [
+  {id:'overview', label:'Overview'},
+  {id:'floors', label:'Floor plans'},
+  {id:'mep', label:'MEP contacts'},
+  {id:'evac', label:'Evacuation routes'},
+  {id:'log', label:'Maintenance log'},
+];
+
+function renderTabs(){
+  const b = getBuilding();
+  const el = document.getElementById('tabs');
+  if(b.status==='pending'){ el.innerHTML=''; return; }
+  el.innerHTML = TABS.map(t=>`<div class="tab ${state.tab===t.id?'active':''}" data-tab="${t.id}">${t.label}</div>`).join('');
+  [...el.querySelectorAll('.tab')].forEach(t=>{
+    t.addEventListener('click', ()=>{
+      state.tab = t.dataset.tab;
+      state.floorIndex = 0;
+      renderContent();
+    });
+  });
+}
+
+/* ---------------------------------------------------------------
+   Leaflet site map (real basemap, toggleable, with overview inset)
+----------------------------------------------------------------*/
+function buildTileLayers(){
+  const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+  });
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom:19, attribution:'Tiles &copy; Esri'
+  });
+  const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom:19, attribution:'&copy; OpenStreetMap contributors &copy; CARTO'
+  });
+  return {streets, satellite, light};
+}
+
+function renderSiteMap(b, containerId){
+  const layers = buildTileLayers();
+  const map = L.map(containerId, {
+    center:[b.center.lat, b.center.lng],
+    zoom:18,
+    layers:[layers.streets],
+  });
+  L.control.layers({ 'Light (Carto)':layers.light, 'Streets (OSM)':layers.streets, 'Satellite (Esri)':layers.satellite }, null, {position:'topright'}).addTo(map);
+  L.control.scale({imperial:true, metric:false, position:'bottomleft'}).addTo(map);
+
+  if(b.footprint){
+    const poly = L.polygon(b.footprint, { color:'#1E2B30', weight:1.5, fillColor:'#C97C1F', fillOpacity:0.18 }).addTo(map);
+    poly.bindPopup(`<strong>${b.name}</strong><br>${b.address}`);
+  } else {
+    L.circleMarker([b.center.lat, b.center.lng], { radius:7, color:'#1E2B30', weight:1.5, fillColor:'#C97C1F', fillOpacity:0.6 })
+      .addTo(map).bindPopup(`<strong>${b.name}</strong><br>Survey not yet scheduled`);
+  }
+
+  // overview inset
+  const miniId = containerId + '-mini';
+  const mini = L.map(miniId, {
+    center:[b.center.lat, b.center.lng], zoom:14,
+    zoomControl:false, attributionControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false,
+  });
+  layers.streets.addTo(mini);
+  const rect = L.rectangle(map.getBounds(), { color:'#C97C1F', weight:1.5, fillOpacity:0.05 }).addTo(mini);
+  map.on('moveend', ()=> rect.setBounds(map.getBounds()));
+
+  setTimeout(()=>{ map.invalidateSize(); mini.invalidateSize(); }, 60);
+}
+
+/* ---------------------------------------------------------------
+   Floor plan SVG — corridor + fixed vertical core + classified rooms
+----------------------------------------------------------------*/
+function coreRoomsSVG(core){
+  let out = '';
+  out += `<rect x="${core.corridor.x}" y="${core.corridor.y}" width="${core.corridor.w}" height="${core.corridor.h}" fill="${USE_COLORS.corridor.fill}" stroke="#3C5561" stroke-width="1"/>`;
+  core.stairs.forEach(s=>{
+    out += `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${USE_COLORS.stair.fill}" stroke="#3C5561" stroke-width="1"/>
+      <text x="${s.x+s.w/2}" y="${s.y+s.h/2}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#1E2B30" transform="rotate(${s.w<s.h?-90:0} ${s.x+s.w/2} ${s.y+s.h/2})">${s.label}</text>`;
+  });
+  const e = core.elevator;
+  out += `<rect x="${e.x}" y="${e.y}" width="${e.w}" height="${e.h}" fill="${USE_COLORS.elevator.fill}" stroke="#3C5561" stroke-width="1"/>
+    <text x="${e.x+e.w/2}" y="${e.y+e.h/2}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="IBM Plex Sans, sans-serif" fill="#1E2B30">${e.label}</text>`;
+  return out;
+}
+
+function floorPlanSVG(building, floor){
+  const rooms = floor.rooms.map(r => {
+    const uc = USE_COLORS[r.use] || USE_COLORS.office;
+    return `
+      <rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${uc.fill}" stroke="#3C5561" stroke-width="1"/>
+      <text x="${r.x + r.w/2}" y="${r.y + r.h/2}" text-anchor="middle" dominant-baseline="middle" font-size="10.5" font-family="IBM Plex Sans, sans-serif" fill="#1E2B30">${r.label}</text>
+    `;
+  }).join('');
+  return `
+  <svg viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="680" height="300" fill="#FBF8F1"/>
+    <rect x="0" y="20" width="680" height="260" fill="none" stroke="#1E2B30" stroke-width="1.5"/>
+    <g transform="translate(0,20)">${coreRoomsSVG(building.core)}${rooms}</g>
+    <text x="12" y="14" font-size="12" font-family="Fraunces, serif" fill="#1E2B30">${floor.label} — ${floor.sub}</text>
+  </svg>`;
+}
+
+function evacSVG(building, floorIndex){
+  const floor = building.floors[floorIndex];
+  const core = building.core;
+  let arrows = '';
+  let notes = '';
+
+  if(floor.groundFloor){
+    arrows = (building.exteriorExits||[]).map(e => `
+      <g transform="translate(${e.x},${e.y+20})">
+        <rect x="-8" y="-6" width="16" height="12" fill="#A8432E"/>
+        <text x="0" y="-10" text-anchor="middle" font-size="8.5" font-family="IBM Plex Mono, monospace" fill="#A8432E">EXIT</text>
+      </g>`).join('');
+    notes = `Ground floor: occupants exit directly to grade at the marked exterior doors.`;
+  } else {
+    arrows = core.stairs.map(s => {
+      const midx = s.x < 340 ? s.x + s.w + 10 : s.x - 10;
+      const dir = s.x < 340 ? 1 : -1;
+      return `<line x1="${midx + dir*60}" y1="${s.y+s.h/2+20}" x2="${midx}" y2="${s.y+s.h/2+20}" stroke="#C97C1F" stroke-width="2.5" marker-end="url(#arrow)"/>`;
+    }).join('');
+    notes = `Upper floor: routes lead to enclosed stairwells, which discharge to grade and the exterior assembly point shown on Floor 1. Elevators are not used during a fire evacuation.`;
+  }
+
+  return {
+    svg: `
+    <svg viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="#C97C1F"/>
+        </marker>
+      </defs>
+      <rect x="0" y="0" width="680" height="300" fill="#FBF8F1"/>
+      <rect x="0" y="20" width="680" height="260" fill="none" stroke="#1E2B30" stroke-width="1.5"/>
+      <g transform="translate(0,20)">
+        ${coreRoomsSVG(core)}
+        ${floor.rooms.map(r=>{
+          const uc = USE_COLORS[r.use] || USE_COLORS.office;
+          return `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${uc.fill}" stroke="#3C5561" stroke-width="1"/>
+            <text x="${r.x+r.w/2}" y="${r.y+r.h/2}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="IBM Plex Sans, sans-serif" fill="#1E2B30">${r.label}</text>`;
+        }).join('')}
+        ${arrows}
+      </g>
+      <text x="12" y="14" font-size="12" font-family="Fraunces, serif" fill="#1E2B30">${floor.label} — evacuation routes</text>
+    </svg>`,
+    notes,
+  };
+}
+
+/* ---------------------------------------------------------------
+   Tab content renderers
+----------------------------------------------------------------*/
+function renderOverview(b){
+  const mapId = 'siteMap' + (mapCounter++);
+  const html = `
+    <div class="sheet fade-in">
+      <h3>Site overview</h3>
+      <div class="map-shell">
+        <div id="${mapId}" class="map-canvas"></div>
+        <div id="${mapId}-mini" class="minimap-wrap"></div>
+        <div class="compass"><div class="arrow"></div>N</div>
+      </div>
+      <p class="map-caption">Basemap layers, scale, and the overview inset (bottom right) are live map controls, not decoration — switch layers with the control in the top-right corner of the map.</p>
+      <p class="note">${b.pocs.length} MEP contacts on file · ${b.issues.filter(i=>i.status!=='resolved').length} open maintenance items · ${b.floors.length} floors surveyed</p>
+    </div>
+  `;
+  return {html, after: ()=> renderSiteMap(b, mapId)};
+}
+
+function renderFloors(b){
+  const floor = b.floors[state.floorIndex];
+  const legendKeys = ['office','corridor','restroom','mechanical','storage','stair','elevator','lobby','retail','common'];
+  return { html: `
+    <div class="sheet fade-in">
+      <h3>Floor plans</h3>
+      <div class="floor-tabs">
+        ${b.floors.map((f,i)=>`<div class="floor-tab ${i===state.floorIndex?'active':''}" data-i="${i}">${f.label}</div>`).join('')}
+      </div>
+      <div class="map-shell"><div class="diagram-body">${floorPlanSVG(b, floor)}</div></div>
+      <div class="legend">
+        ${legendKeys.filter(k=>USE_COLORS[k]).map(k=>`<span><span class="swatch" style="background:${USE_COLORS[k].fill}"></span>${USE_COLORS[k].label}</span>`).join('')}
+      </div>
+      <p class="note">Stairwells and the elevator sit in the same position on every floor of this building — the vertical circulation core doesn't move between floors, the way a real building's does.</p>
+    </div>
+  `, after:null };
+}
+
+function renderMEP(b){
+  return { html: `
+    <div class="sheet fade-in">
+      <h3>MEP &amp; service contacts</h3>
+      <div class="poc-grid">
+        ${b.pocs.map(p=>`
+          <div class="poc-card">
+            <div class="avatar" style="background:${p.color}">${p.contact.split(' ').map(n=>n[0]).join('')}</div>
+            <div class="poc-info">
+              <div class="trade">${p.trade}</div>
+              <div class="company">${p.company}</div>
+              <div class="contact">${p.contact}</div>
+              <div class="meta">${p.phone} · ${p.email}</div>
+              <div class="meta">Last serviced ${p.last}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `, after:null };
+}
+
+function renderEvac(b){
+  const floor = b.floors[state.floorIndex];
+  const result = evacSVG(b, state.floorIndex);
+  return { html: `
+    <div class="sheet fade-in">
+      <h3>Evacuation routes</h3>
+      <div class="floor-tabs">
+        ${b.floors.map((f,i)=>`<div class="floor-tab ${i===state.floorIndex?'active':''}" data-i="${i}">${f.label}</div>`).join('')}
+      </div>
+      <div class="map-shell"><div class="diagram-body">${result.svg}</div></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:${USE_COLORS.stair.fill}"></span>Stairwell (egress)</span>
+        <span><span class="swatch" style="background:${USE_COLORS.elevator.fill}"></span>Elevator</span>
+        <span><span class="swatch" style="background:#A8432E"></span>Exterior exit (ground floor only)</span>
+      </div>
+      <div class="evac-note">${result.notes}</div>
+    </div>
+  `, after:null };
+}
+
+function renderLog(b){
+  const rows = b.issues.map(i => `
+    <tr>
+      <td class="mono">${i.id}</td>
+      <td>${i.title}</td>
+      <td>${i.location}</td>
+      <td>${i.category}</td>
+      <td><span class="pri ${i.priority}">${i.priority}</span></td>
+      <td><span class="badge ${i.status==='open'?'open':i.status==='progress'?'progress':'resolved'}">${i.status==='progress'?'in progress':i.status}</span></td>
+      <td>${i.date}</td>
+    </tr>
+  `).join('');
+
+  const roomLocations = b.floors.flatMap(f=>f.rooms.map(r=>r.label));
+  const coreLocations = b.core ? [...b.core.stairs.map(s=>s.label), b.core.elevator.label, 'Corridor'] : [];
+  const locationOptions = [...roomLocations, ...coreLocations]
+    .filter((v,i,a)=>a.indexOf(v)===i)
+    .map(l=>`<option value="${l}">${l}</option>`).join('');
+
+  return { html: `
+    <div class="sheet fade-in">
+      <h3>Maintenance log</h3>
+      <table class="log-table">
+        <thead><tr><th>ID</th><th>Issue</th><th>Location</th><th>Category</th><th>Priority</th><th>Status</th><th>Reported</th></tr></thead>
+        <tbody id="logBody">${rows}</tbody>
+      </table>
+      <form class="log-form" id="issueForm">
+        <div class="field">
+          <label>Location</label>
+          <select name="location">${locationOptions}<option value="Other / common area">Other / common area</option></select>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <select name="category">
+            <option>HVAC</option><option>Electrical</option><option>Plumbing</option>
+            <option>Fire & life safety</option><option>Elevator</option><option>Landscaping</option><option>Maintenance</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select name="priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+        </div>
+        <div class="field">
+          <label>Reported by</label>
+          <input type="text" name="reportedBy" placeholder="e.g. Site tech, tenant name">
+        </div>
+        <div class="field full">
+          <label>Description</label>
+          <textarea name="title" placeholder="Briefly describe the issue" required></textarea>
+        </div>
+        <div class="submit-row"><button type="submit">Log issue</button></div>
+      </form>
+    </div>
+  `, after:null };
+}
+
+function renderPendingState(b){
+  const mapId = 'siteMap' + (mapCounter++);
+  const html = `
+    <div class="sheet empty-state fade-in">
+      <h3>${b.name} hasn't been surveyed yet</h3>
+      <div class="map-shell"><div id="${mapId}" class="map-canvas" style="height:220px;"></div></div>
+      <p>We know where this one is — once it's added, we walk the site to capture footprints and floor plans, log MEP and service contacts, and mark egress routes, the same process used for the properties already in this portfolio.</p>
+      <button id="startSurveyBtn">Start survey</button>
+    </div>
+  `;
+  return {html, after: ()=> renderSiteMap(b, mapId)};
+}
+
+function renderContent(){
+  const b = getBuilding();
+  const wrap = document.getElementById('tabContent');
+
+  if(b.status==='pending'){
+    const {html, after} = renderPendingState(b);
+    wrap.innerHTML = html;
+    if(after) after();
+    const btn = document.getElementById('startSurveyBtn');
+    if(btn) btn.addEventListener('click', ()=>{
+      btn.textContent = 'Survey requested ✓';
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.style.cursor = 'default';
+    });
+    return;
+  }
+
+  let result;
+  if(state.tab==='overview') result = renderOverview(b);
+  else if(state.tab==='floors') result = renderFloors(b);
+  else if(state.tab==='mep') result = renderMEP(b);
+  else if(state.tab==='evac') result = renderEvac(b);
+  else if(state.tab==='log') result = renderLog(b);
+  wrap.innerHTML = result.html;
+  if(result.after) result.after();
+
+  [...wrap.querySelectorAll('.floor-tab')].forEach(t=>{
+    t.addEventListener('click', ()=>{
+      state.floorIndex = parseInt(t.dataset.i,10);
+      renderContent();
+    });
+  });
+
+  const form = document.getElementById('issueForm');
+  if(form){
+    form.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const fd = new FormData(form);
+      const nextNum = 1000 + b.issues.length + 1;
+      b.issues.unshift({
+        id: 'ISS-' + nextNum,
+        title: fd.get('title') || 'Untitled issue',
+        location: fd.get('location'),
+        category: fd.get('category'),
+        priority: fd.get('priority'),
+        status: 'open',
+        reportedBy: fd.get('reportedBy') || 'Property manager',
+        date: 'Just now',
+      });
+      renderContent();
+    });
+  }
+}
+
+function renderAll(){
+  renderSidebar();
+  renderTitleblock();
+  renderTabs();
+  renderContent();
+}
+
+document.getElementById('addPropertyBtn').addEventListener('click', ()=>{
+  alert('In the full version, this opens a short intake form — address, approximate square footage, and building type — and schedules the initial site survey.');
+});
+
+renderAll();
+</script>
+</body>
+</html>
